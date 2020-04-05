@@ -1,0 +1,256 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<script type="text/javascript">
+var gl;
+var shaderProgram;
+var uPMatrix;
+var vertexPositionBuffer;
+var vertexColorBuffer;
+var anglex;
+var angley;
+var anglez;
+function startGL() 
+{
+  alert("StartGL");
+  let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony 
+  gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
+  gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczoœci do systemu OpenGL
+  gl.viewportHeight = canvas.height;
+  
+    //Kod shaderów
+  const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
+    precision highp float;
+    attribute vec3 aVertexPosition; 
+    attribute vec3 aVertexColor;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 vColor;
+    void main(void) {
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); //Dokonanie transformacji po³o¿enia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      vColor = aVertexColor;
+    }
+  `;
+  const fragmentShaderSource = `
+    precision highp float;
+    varying vec3 vColor;
+    void main(void) {
+      gl_FragColor = vec4(vColor,1.0); //Ustalenie sta³ego koloru wszystkich punktów sceny
+    }
+  `;
+  let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera 
+  let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpiêcie Ÿród³a kodu shader
+  gl.shaderSource(vertexShader, vertextShaderSource);
+  gl.compileShader(fragmentShader); //Kompilacja kodu shader
+  gl.compileShader(vertexShader);
+  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych b³edów kompilacji
+    alert(gl.getShaderInfoLog(fragmentShader));
+    return null;
+  }
+  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+    alert(gl.getShaderInfoLog(vertexShader));
+    return null;
+  }
+  
+  shaderProgram = gl.createProgram(); //Stworzenie obiektu programu 
+  gl.attachShader(shaderProgram, vertexShader); //Podpiêcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+  gl.attachShader(shaderProgram, fragmentShader);
+  gl.linkProgram(shaderProgram);
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych b³edów
+  
+  //Opis sceny 3D, po³o¿enie punktów w przestrzeni 3D w formacie X,Y,Z 
+  let vertexPosition = [
+  //Top
+    -1.0, +1.0, -1.0,  -1.0, +1.0, +1.0,  +1.0, +1.0, +1.0, //3 punkty po 3 sk³adowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójk¹t
+    -1.0, +1.0, -1.0,  +1.0, +1.0, +1.0,  +1.0, +1.0, -1.0,
+  //Left
+    -1.0, -1.0, +1.0,  -1.0, +1.0, +1.0,  -1.0, -1.0, -1.0,
+    -1.0, -1.0, -1.0,  -1.0, +1.0, +1.0,  -1.0, +1.0, -1.0,
+  //Right
+    +1.0, +1.0, +1.0,  +1.0, -1.0, +1.0,  +1.0, -1.0, -1.0,
+    +1.0, +1.0, +1.0,  +1.0, -1.0, -1.0,  +1.0, +1.0, -1.0,
+  //Front
+    +1.0, -1.0, +1.0,  +1.0, +1.0, +1.0,  -1.0, -1.0, +1.0,
+    -1.0, +1.0, +1.0,  -1.0, -1.0, +1.0,  +1.0, +1.0, +1.0,
+  //Back
+    +1.0, +1.0, -1.0,  +1.0, -1.0, -1.0,  -1.0, -1.0, -1.0,
+    +1.0, +1.0, -1.0,  -1.0, -1.0, -1.0,  -1.0, +1.0, -1.0,
+  //Bottom
+    -1.0, -1.0, +1.0,  -1.0, -1.0, -1.0,  +1.0, -1.0, +1.0,
+    +1.0, -1.0, +1.0,  -1.0, -1.0, -1.0,  +1.0, -1.0, -1.0
+  ]
+  
+  vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
+  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby wspó³rzednych per wierzcho³ek
+  vertexPositionBuffer.numItems = 12; //Zdefinoiowanie liczby punktów w naszym buforze
+  
+  //Opis sceny 3D, kolor ka¿dego z wierzcho³ków
+  let vertexColor = [
+  //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 sk³adowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójk¹t
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+  ]
+
+ vertexColorBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexColor), gl.STATIC_DRAW);
+  vertexColorBuffer.itemSize = 3;
+  vertexColorBuffer.numItems = 12;
+  
+  
+  //Macierze opisuj¹ce po³o¿enie wirtualnej kamery w przestrzenie 3D
+  let aspect = gl.viewportWidth/gl.viewportHeight;
+  let fov = 45.0 * Math.PI / 180.0; //Okreœlenie pola widzenia kamery
+  let zFar = 100.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbli¿szego zNear do najdalszego zFar)
+  let zNear = 0.1;
+  uPMatrix = [
+   1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
+   0                         ,1.0/(Math.tan(fov/2))         ,0                         ,0                            ,
+   0                         ,0                           ,-(zFar+zNear)/(zFar-zNear)  , -1,
+   0                         ,0                           ,-(2*zFar*zNear)/(zFar-zNear) ,0.0,
+  ];
+ anglex=0;
+ angley=0;
+ anglez=0;
+  Tick();
+} 
+
+
+
+
+
+let angle = 45.0; //Macierz transformacji œwiata - okreœlenie po³o¿enia kamery 
+
+
+
+function Mul(a, b)
+ {
+  var aNumRows = a.length, aNumCols = a[0].length,
+      bNumRows = b.length, bNumCols = b[0].length,
+      m = new Array(aNumRows);  
+      
+  for (var r = 0; r < aNumRows; ++r)
+  {
+    m[r] = new Array(bNumCols); 
+    for (var c = 0; c < bNumCols; ++c) 
+	{
+      m[r][c] = 0;             
+      for (var i = 0; i < aNumCols; ++i) 
+	  {
+        m[r][c] += a[r][i] * b[i][c];
+      }
+    }
+  }
+  return m;
+}
+
+function changeSize(m)
+{
+n = new Array(16);  
+var k = 0;
+  for (var i = 0; i < 4; i++)
+  {
+	for(var j = 0; j<4;j++) 
+	{
+	n[k] = m[i][j];
+	k=k+1; 
+	}
+  }
+return n;
+}
+
+
+function CreateMatrix(anglex,angley,anglez)
+{
+  
+  let x = [
+  [Math.cos(anglex*Math.PI/180.0),0,-Math.sin(anglex*Math.PI/180.0),0],
+  [0,1,0,0],
+  [Math.sin(anglex*Math.PI/180.0),0,Math.cos(anglex*Math.PI/180.0),0],
+  [0,0,-10,1] 
+  ];
+
+ let y = [
+  [Math.cos(angley*Math.PI/180.0),Math.sin(angley*Math.PI/180.0),0,0], 
+  [-Math.sin(angley*Math.PI/180.0),Math.cos(angley*Math.PI/180.0),0,0],
+  [0,0,1,0.0],
+  [0,0,1,1] 
+  ];
+
+  let z = [
+  [1,0,0,0], 
+  [0,Math.cos(anglez*Math.PI/180.0),Math.sin(anglez*Math.PI/180.0),0],
+  [0,-Math.sin(anglez*Math.PI/180.0),Math.cos(anglez*Math.PI/180.0),0.0],
+  [0,0,1,1]
+  ];
+
+ let w = Mul(y,z);
+ uMVMatrix = Mul(w,x);
+
+  return (uMVMatrix);
+}
+
+
+
+
+function Tick()
+{  
+anglez = anglez+1;
+angley = angley+1;
+anglex = anglex+1;
+
+let L = CreateMatrix(anglex,angley,anglez);
+uMVMatrix = changeSize(L); 
+
+  
+  //alert(uPMatrix);
+  
+  //Render Scene
+  gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); 
+  gl.clearColor(0.0,128.0,128.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
+  gl.clearDepth(1.0);             //Wyczyœcienie bufora g³ebi najdalszym planem
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(shaderProgram)   //U¿ycie przygotowanego programu shaderowego
+  
+  gl.enable(gl.DEPTH_TEST);           // W³¹czenie testu g³êbi - obiekty bli¿sze maj¹ przykrywaæ obiekty dalsze
+  gl.depthFunc(gl.LEQUAL);            // 
+  
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamiêci karty graficznej
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMVMatrix"), false, new Float32Array(uMVMatrix));
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie po³o¿enia
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazanie kolorów
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywo³anie rendrowania
+   
+  setTimeout(Tick,100);
+}
+</script>
+</head>
+<body onload="startGL()">
+<canvas id="canvas3D" width="640" height="480" style="border: solid black 1px"></canvas>
+</body>
+</html>
