@@ -15,10 +15,10 @@ function startGL()
   alert("StartGL");
   let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony 
   gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
-  gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczoœci do systemu OpenGL
+  gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczoî¯Ši do systemu OpenGL
   gl.viewportHeight = canvas.height;
   
-    //Kod shaderów
+    //Kod shaderé—š
   const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
     precision highp float;
     attribute vec3 aVertexPosition; 
@@ -27,7 +27,7 @@ function startGL()
     uniform mat4 uPMatrix;
     varying vec3 vColor;
     void main(void) {
-      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); //Dokonanie transformacji po³o¿enia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); //Dokonanie transformacji poé€™ç nia punkté—š z przestrzeni 3D do przestrzeni obrazu (2D)
       vColor = aVertexColor;
     }
   `;
@@ -35,16 +35,16 @@ function startGL()
     precision highp float;
     varying vec3 vColor;
     void main(void) {
-      gl_FragColor = vec4(vColor,1.0); //Ustalenie sta³ego koloru wszystkich punktów sceny
+      gl_FragColor = vec4(vColor,1.0); //Ustalenie staè²«go koloru wszystkich punkté—š sceny
     }
   `;
   let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera 
   let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
-  gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpiêcie Ÿród³a kodu shader
+  gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpiç’šie î¶°éšè±‰ kodu shader
   gl.shaderSource(vertexShader, vertextShaderSource);
   gl.compileShader(fragmentShader); //Kompilacja kodu shader
   gl.compileShader(vertexShader);
-  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych b³edów kompilacji
+  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych bè²«dé—š kompilacji
     alert(gl.getShaderInfoLog(fragmentShader));
     return null;
   }
@@ -54,15 +54,15 @@ function startGL()
   }
   
   shaderProgram = gl.createProgram(); //Stworzenie obiektu programu 
-  gl.attachShader(shaderProgram, vertexShader); //Podpiêcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+  gl.attachShader(shaderProgram, vertexShader); //Podpiç’šie obu shaderé—š do naszego programu wykonywanego na karcie graficznej
   gl.attachShader(shaderProgram, fragmentShader);
   gl.linkProgram(shaderProgram);
-  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych b³edów
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych bè²«dé—š
   
-  //Opis sceny 3D, po³o¿enie punktów w przestrzeni 3D w formacie X,Y,Z 
+  //Opis sceny 3D, poé€™ç nie punkté—š w przestrzeni 3D w formacie X,Y,Z 
   let vertexPosition = [
   //Top
-    -1.0, +1.0, -1.0,  -1.0, +1.0, +1.0,  +1.0, +1.0, +1.0, //3 punkty po 3 sk³adowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójk¹t
+    -1.0, +1.0, -1.0,  -1.0, +1.0, +1.0,  +1.0, +1.0, +1.0, //3 punkty po 3 skè±‰dowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 tré©ké–
     -1.0, +1.0, -1.0,  +1.0, +1.0, +1.0,  +1.0, +1.0, -1.0,
   //Left
     -1.0, -1.0, +1.0,  -1.0, +1.0, +1.0,  -1.0, -1.0, -1.0,
@@ -84,13 +84,13 @@ function startGL()
   vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
-  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby wspó³rzednych per wierzcho³ek
-  vertexPositionBuffer.numItems = 12; //Zdefinoiowanie liczby punktów w naszym buforze
+  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby wspé¦§rzednych per wierzchoè²«k
+  vertexPositionBuffer.numItems = 12; //Zdefinoiowanie liczby punkté—š w naszym buforze
   
-  //Opis sceny 3D, kolor ka¿dego z wierzcho³ków
+  //Opis sceny 3D, kolor kaç›¥ego z wierzchoè¶¾é—š
   let vertexColor = [
   //Top
-    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 sk³adowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójk¹t
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 skè±‰dowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 tré©ké–
     1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
   //Left
     0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
@@ -116,10 +116,10 @@ function startGL()
   vertexColorBuffer.numItems = 12;
   
   
-  //Macierze opisuj¹ce po³o¿enie wirtualnej kamery w przestrzenie 3D
+  //Macierze opisujé‰e poé€™ç nie wirtualnej kamery w przestrzenie 3D
   let aspect = gl.viewportWidth/gl.viewportHeight;
-  let fov = 45.0 * Math.PI / 180.0; //Okreœlenie pola widzenia kamery
-  let zFar = 100.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbli¿szego zNear do najdalszego zFar)
+  let fov = 45.0 * Math.PI / 180.0; //Okreî¯“enie pola widzenia kamery
+  let zFar = 100.0; //Ustalenie zakresé—š renderowania sceny 3D (od obiektu najbliçªºzego zNear do najdalszego zFar)
   let zNear = 0.1;
   uPMatrix = [
    1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
@@ -137,7 +137,7 @@ function startGL()
 
 
 
-let angle = 45.0; //Macierz transformacji œwiata - okreœlenie po³o¿enia kamery 
+let angle = 45.0; //Macierz transformacji î¯iata - okreî¯“enie poé€™ç nia kamery 
 
 
 
@@ -225,26 +225,26 @@ uMVMatrix = changeSize(L);
   
   //Render Scene
   gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); 
-  gl.clearColor(0.0,128.0,128.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
-  gl.clearDepth(1.0);             //Wyczyœcienie bufora g³ebi najdalszym planem
+  gl.clearColor(245.0,245.0,220.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
+  gl.clearDepth(1.0);             //Wyczyî¯Šienie bufora gè²«bi najdalszym planem
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.useProgram(shaderProgram)   //U¿ycie przygotowanego programu shaderowego
+  gl.useProgram(shaderProgram)   //Uç¯¡cie przygotowanego programu shaderowego
   
-  gl.enable(gl.DEPTH_TEST);           // W³¹czenie testu g³êbi - obiekty bli¿sze maj¹ przykrywaæ obiekty dalsze
+  gl.enable(gl.DEPTH_TEST);           // Wç« czenie testu gå–šbi - obiekty bliçªºze majï¿½ przykrywaï¿½ obiekty dalsze
   gl.depthFunc(gl.LEQUAL);            // 
   
-  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamiêci karty graficznej
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamiç’ši karty graficznej
   gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMVMatrix"), false, new Float32Array(uMVMatrix));
   
-  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie po³o¿enia
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie poé€™ç nia
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
   gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
-  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazanie kolorów
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazanie koloré—š
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
   gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
-  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywo³anie rendrowania
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywoè±‰nie rendrowania
    
   setTimeout(Tick,100);
 }
