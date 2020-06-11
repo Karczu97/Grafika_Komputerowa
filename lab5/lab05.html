@@ -1,0 +1,344 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <script type="text/javascript" src="PlanetPos.js"></script>
+    <script type="text/javascript">
+        let gl;
+        let shaderProgram;
+        let uPMatrix;
+        let vertexPositionBuffer;
+        let vertexColorBuffer;
+
+        class Planet {
+            constructor(tri_vert, col_vert, tex_vert) {
+                this.triangle_vertecies = tri_vert;
+                this.color_vertecies = col_vert;
+                this.texture_vertecies = tex_vert;
+            }
+            triangleVertertecies() {
+                return this.triangle_vertecies;
+            }
+            colorVertecies() {
+                return this.color_vertecies;
+            }
+            setTextureOffset(texture_offset_x = 0, texture_offset_y = 0) {
+                for (let i = 0; i < 72; i += 2) {
+                    this.texture_vertecies[i] += texture_offset_x;
+                    this.texture_vertecies[i+1] += texture_offset_y;
+                }
+            }
+            textureVertecies() {
+                return this.texture_vertecies;
+            }
+        }
+
+        function MatrixMul(a,b)  {//Mnożenie macierzy
+            c = [
+                0,0,0,0,
+                0,0,0,0,
+                0,0,0,0,
+                0,0,0,0
+            ]
+            for(let i=0;i<4;i++) {
+                for(let j=0;j<4;j++) {
+                    c[i*4+j] = 0.0;
+                    for(let k=0;k<4;k++) {
+                        c[i*4+j]+= a[i*4+k] * b[k*4+j];
+                    }
+                }
+            }
+            return c;
+        }
+
+        function startGL() {
+            let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony
+            gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
+            gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczości do systemu OpenGL
+            gl.viewportHeight = canvas.height;
+
+            //Kod shaderów
+            const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
+    precision highp float;
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexColor;
+    attribute vec2 aVertexCoords;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 vColor;
+    varying vec2 vTexUV;
+    void main(void) {
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); //Dokonanie transformacji położenia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      vColor = aVertexColor;
+      vTexUV = aVertexCoords;
+    }
+  `;
+            const fragmentShaderSource = `
+    precision highp float;
+    varying vec3 vColor;
+    varying vec2 vTexUV;
+    uniform sampler2D uSampler;
+    void main(void) {
+      //gl_FragColor = vec4(vColor,1.0); //Ustalenie stałego koloru wszystkich punktów sceny
+      gl_FragColor = texture2D(uSampler,vTexUV); //Odczytanie punktu tekstury i przypisanie go jako koloru danego punktu renderowaniej figury
+    }
+  `;
+            let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera
+            let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpięcie źródła kodu shader
+            gl.shaderSource(vertexShader, vertextShaderSource);
+            gl.compileShader(fragmentShader); //Kompilacja kodu shader
+            gl.compileShader(vertexShader);
+            if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych błedów kompilacji
+                alert(gl.getShaderInfoLog(fragmentShader));
+                return null;
+            }
+            if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                alert(gl.getShaderInfoLog(vertexShader));
+                return null;
+            }
+
+            shaderProgram = gl.createProgram(); //Stworzenie obiektu programu
+            gl.attachShader(shaderProgram, vertexShader); //Podpięcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
+
+            let sun = new Planet(sun_vertecies,sun_colors,sun_offset);
+            let mercury = new Planet(mercury_vertecies,mercury_colors,mercury_offset);
+            let venus = new Planet(venus_vertecies,venus_colors,venus_offset);
+            let earth = new Planet(earth_vertecies,earth_colors,earth_offset);
+            let mars = new Planet(mars_vertecies,mars_colors,mars_offset);
+            let jupiter = new Planet(jupiter_vertecies,jupiter_colors,jupiter_offset);
+            let saturn = new Planet(saturn_vertecies,saturn_colors,saturn_offset);
+            let uranus = new Planet(uranus_vertecies,uranus_colors,uranus_offset);
+            let neptune = new Planet(neptune_vertecies,neptune_colors,neptune_offset);
+            let moon = new Planet(moon_vertecies,moon_colors,moon_offset);
+            let deimos = new Planet(deimos_vertecies,deimos_colors,deimos_offset);
+            let phobos = new Planet(phobos_vertecies,phobos_colors,phobos_offset);
+
+            mercury.setTextureOffset(0.25);
+            venus.setTextureOffset(0.5);
+            earth.setTextureOffset(0.75);
+            mars.setTextureOffset(0,0.25);
+            jupiter.setTextureOffset(0.25,0.25);
+            saturn.setTextureOffset(0.5,0.25);
+            uranus.setTextureOffset(0.75,0.25);
+            neptune.setTextureOffset(0,0.5);
+            moon.setTextureOffset(0.25,0.5);
+            deimos.setTextureOffset(0.5,0.5);
+            phobos.setTextureOffset(0.5,0.75);
+
+            let solar_system =[]
+            solar_system.push(sun);
+            solar_system.push(mercury);
+            solar_system.push(venus);
+            solar_system.push(earth);
+            solar_system.push(mars);
+            solar_system.push(jupiter);
+            solar_system.push(saturn);
+            solar_system.push(uranus);
+            solar_system.push(neptune);
+            solar_system.push(moon);
+            solar_system.push(deimos);
+            solar_system.push(phobos);
+
+            let vertexPosition = [];
+            for(let planet of solar_system) {
+                vertexPosition = vertexPosition.concat(planet.triangleVertertecies());
+            }
+
+            vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
+            vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby współrzednych per wierzchołek
+            vertexPositionBuffer.numItems = vertexPosition.length / (vertexPositionBuffer.itemSize * 3); //Zdefinoiowanie liczby punktów w naszym buforze
+
+            //Opis sceny 3D, kolor każdego z wierzchołków
+
+            let vertexColor = [];
+
+            for(let planet of solar_system) {
+                vertexColor = vertexColor.concat(planet.colorVertecies());
+            }
+
+            vertexColorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexColor), gl.STATIC_DRAW);
+            vertexColorBuffer.itemSize = 3;
+            vertexColorBuffer.numItems = vertexColor.length / (vertexColorBuffer.itemSize * 3);
+
+            let vertexCoords = [];
+
+            for(let planet of solar_system) {
+                vertexCoords = vertexCoords.concat(planet.textureVertecies());
+            }
+
+
+            vertexCoordsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexCoordsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexCoords), gl.STATIC_DRAW);
+            vertexCoordsBuffer.itemSize = 2;
+            vertexCoordsBuffer.numItems = vertexCoords.length / (vertexCoordsBuffer.itemSize * 3);
+
+            textureBuffer = gl.createTexture();
+            var textureImg = new Image();
+            textureImg.src="PlanetTex.png"; //Nazwa obrazka
+            textureImg.onload = function() { //Wykonanie kodu automatycznie po załadowaniu obrazka
+                gl.bindTexture(gl.TEXTURE_2D, textureBuffer);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textureImg); //Faktyczne załadowanie danych obrazu do pamieci karty graficznej
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Ustawienie parametrów próbkowania tekstury
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+            
+
+            //Macierze opisujące położenie wirtualnej kamery w przestrzenie 3D
+            let aspect = gl.viewportWidth/gl.viewportHeight;
+            let fov = 45.0 * Math.PI / 180.0; //Określenie pola widzenia kamery
+            let zFar = 2000.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbliższego zNear do najdalszego zFar)
+            let zNear = 0.1;
+            uPMatrix = [
+                1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
+                0                         ,1.0/(Math.tan(fov/2))         ,0                         ,0                            ,
+                0                         ,0                           ,-(zFar+zNear)/(zFar-zNear)  , -1,
+                0                         ,0                           ,-(2*zFar*zNear)/(zFar-zNear) ,0.0,
+            ];
+
+            Tick();
+        }
+        let CameraAngleZ = 0.0;
+        let CameraAngleY = 0.0;
+        let CameraAngleX = 90.0;
+        let TranslateX = 0.0;
+        let TranslateY = -800.0;
+        let TranslateZ = 0.0;
+        let MovementSpeedMultiplier = 5;
+
+        
+        function CalculateCameraPosition() {
+            let uMVMatrix = [
+                1,0,0,0, //Macierz jednostkowa
+                0,1,0,0,
+                0,0,1,0,
+                0,0,90,1
+            ];
+
+            let uMVRotZ = [
+                +Math.cos(CameraAngleZ*Math.PI/180.0),+Math.sin(CameraAngleZ*Math.PI/180.0),0,0,
+                -Math.sin(CameraAngleZ*Math.PI/180.0),+Math.cos(CameraAngleZ*Math.PI/180.0),0,0,
+                0,0,1,0,
+                0,0,0,1
+            ];
+
+            let uMVRotY = [
+                +Math.cos(CameraAngleY*Math.PI/180.0),0,-Math.sin(CameraAngleY*Math.PI/180.0),0,
+                0,1,0,0,
+                +Math.sin(CameraAngleY*Math.PI/180.0),0,+Math.cos(CameraAngleY*Math.PI/180.0),0,
+                0,0,0,1
+            ];
+
+            let uMVRotX = [
+                1,0,0,0,
+                0,+Math.cos(CameraAngleX*Math.PI/180.0),+Math.sin(CameraAngleX*Math.PI/180.0),0,
+                0,-Math.sin(CameraAngleX*Math.PI/180.0),+Math.cos(CameraAngleX*Math.PI/180.0),0,
+                0,0,0,1
+            ];
+
+            let uMVTranslateX = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                TranslateX,0,0,1
+            ];
+
+            let uMVTranslateY = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                0,TranslateY,0,1
+            ];
+
+            let uMVTranslateZ = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                0,0,TranslateZ,1
+            ];
+
+            uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateX);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateY);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateZ);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVRotX);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVRotY);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVRotZ);
+
+            return uMVMatrix;
+        }
+
+        function Tick() {
+
+            let uMVMatrix = CalculateCameraPosition();
+            //alert(uPMatrix);
+
+            //Render Scene
+            gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+            gl.clearColor(0.0,0.0,0.0,1.0); //Wyczyszczenie obrazu kolorem czarnym
+            gl.clearDepth(1.0);             //Wyczyścienie bufora głebi najdalszym planem
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.useProgram(shaderProgram); //Użycie przygotowanego programu shaderowego
+
+            gl.enable(gl.DEPTH_TEST);           // Włączenie testu głębi - obiekty bliższe mają przykrywać obiekty dalsze
+            gl.depthFunc(gl.LEQUAL);            //
+
+            gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamięci karty graficznej
+            gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMVMatrix"), false, new Float32Array(uMVMatrix));
+
+            gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+            gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazanie kolorów
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+            gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexCoords"));  //Pass the geometry
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexCoordsBuffer);
+            gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexCoords"), vertexCoordsBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textureBuffer);
+            gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 0);
+
+            gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+            setTimeout(Tick,0);
+        }
+
+        function handlekeydown(event) {
+            if(event.keyCode===87) { //W
+                TranslateZ += MovementSpeedMultiplier;
+            }
+            if(event.keyCode===83) { //S
+                TranslateZ -= MovementSpeedMultiplier;
+            }
+            if(event.keyCode===68) { //D
+                TranslateX -= MovementSpeedMultiplier;
+            }
+            if(event.keyCode===65) { //A
+                TranslateX += MovementSpeedMultiplier;
+            }
+            if(event.keyCode===69) { // E
+                TranslateY -= MovementSpeedMultiplier;
+            }
+            if(event.keyCode===81) { // Q
+                TranslateY += MovementSpeedMultiplier;
+            }
+        }
+
+    </script>
+</head>
+<canvas id="canvas3D" width="1280" height="800" style="border: solid black 1px"></canvas>
+<body onload="startGL()" onkeydown="handlekeydown(event)">
+
+</body>
+</html>
