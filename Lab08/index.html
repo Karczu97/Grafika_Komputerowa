@@ -1,0 +1,406 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <script type="text/javascript" src="sphere.js"></script>
+    <script type="text/javascript" src="texture_vertecies.js"></script>
+    <script type="text/javascript">
+        let gl;
+        let shaderProgram;
+        let uPMatrix;
+        let texture_buffers = [];
+        let planets = [];
+
+        let CameraAngleZ = 0.0;
+        let CameraAngleY = 180.0;
+        let CameraAngleX = 0.0;
+        let TranslateX = 0.0;
+        let TranslateY = 0.0;
+        let TranslateZ = 40.0;
+        let MovementSpeedMultiplier = 1;
+        let CameraAngleSpeedMultiplier = 0.5;
+        let LightSpeedMultiplier = 0.25;
+
+        let lightX = 0;
+        let lightY = 0;
+        let lightZ = 0;
+
+        let orbit_degree = 0;
+        let orbit_step = 0.1;
+        let init_phase = [];
+        let rotation_angle = [];
+        let rotation_angle_step = [];
+
+
+        function MatrixMul(a,b) { //Mnożenie macierzy
+            c = [
+                0,0,0,0,
+                0,0,0,0,
+                0,0,0,0,
+                0,0,0,0
+            ]
+            for(let i=0;i<4;i++) {
+                for(let j=0;j<4;j++) {
+                    c[i*4+j] = 0.0;
+                    for(let k=0;k<4;k++) {
+                        c[i*4+j]+= a[i*4+k] * b[k*4+j];
+                    }
+                }
+            }
+            return c;
+        }
+
+        function createRect2(p1x,p1y,p1z,p2x,p2y,p2z,p3x,p3y,p3z,p4x,p4y,p4z) {
+            let vertexPosition = [
+                p1x,p1y,p1z, p2x,p2y,p2z, p4x,p4y,p4z,      //Pierwszy trójkąt
+                p1x,p1y,p1z, p4x,p4y,p4z, p3x,p3y,p3z ];    //Drugi trójkąt
+            return vertexPosition;
+        }
+
+        function createRectColor(r,g,b) {
+            let vertexColor = [
+                r,g,b, r,g,b, r,g,b,    //Pierwszy trójkąt
+                r,g,b, r,g,b, r,g,b ];  //Drugi trójkąt
+            return vertexColor;
+        }
+
+        function startGL() {
+            let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony
+            gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
+            gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczości do systemu OpenGL
+            gl.viewportHeight = canvas.height;
+
+            //Kod shaderów
+            const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
+    precision highp float;
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexColor;
+    attribute vec2 aVertexCoords;
+    attribute vec3 aVertexNormal;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying vec2 vTexUV;
+    varying vec3 vNormal;
+    void main(void) {
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); //Dokonanie transformacji położenia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      vPos = aVertexPosition;
+      vColor = aVertexColor;
+      vTexUV = aVertexCoords;
+      vNormal = aVertexNormal;
+    }
+  `;
+            const fragmentShaderSource = `
+    precision highp float;
+    varying vec3 vPos;
+    varying vec3 vColor;
+    varying vec2 vTexUV;
+    varying vec3 vNormal;
+    uniform sampler2D uSampler;
+    uniform vec3 uLightPosition;
+    void main(void) {
+       vec3 lightDirection = normalize(uLightPosition - vPos);
+       float brightness = max(dot(vNormal,lightDirection), 0.0);
+      //gl_FragColor = vec4(vColor,1.0); //Ustalenie stałego koloru wszystkich punktów sceny
+      //gl_FragColor = texture2D(uSampler,vTexUV)*vec4(vColor,1.0); //Odczytanie punktu tekstury i przypisanie go jako koloru danego punktu renderowaniej figury
+      //gl_FragColor = vec4((vNormal+vec3(1.0,1.0,1.0))/2.0,1.0);
+      gl_FragColor = clamp(texture2D(uSampler,vTexUV) * vec4(brightness,brightness,brightness,1.0),0.0,1.0);
+    }
+  `;
+            let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera
+            let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpięcie źródła kodu shader
+            gl.shaderSource(vertexShader, vertextShaderSource);
+            gl.compileShader(fragmentShader); //Kompilacja kodu shader
+            gl.compileShader(vertexShader);
+            if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych błedów kompilacji
+                alert(gl.getShaderInfoLog(fragmentShader));
+                return null;
+            }
+            if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                alert(gl.getShaderInfoLog(vertexShader));
+                return null;
+            }
+
+            shaderProgram = gl.createProgram(); //Stworzenie obiektu programu
+            gl.attachShader(shaderProgram, vertexShader); //Podpięcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
+
+            let sun = new Sphere(10.0,0,"Sun.png",sphere_texture_vertecies,0,0,0,true);
+            let mercury = new Sphere(0.5,45,"Mercury.png",sphere_texture_vertecies,45);
+            let venus = new Sphere(0.75,55,"Venus.png",sphere_texture_vertecies,55);
+            let earth = new Sphere(1.0,78,"Earth.png",sphere_texture_vertecies,78);
+            let mars = new Sphere(1.0,100,"Mars.png",sphere_texture_vertecies,100);
+            let jupiter = new Sphere(5.0,150,"Jupiter.png",sphere_texture_vertecies,150);
+            let saturn = new Sphere(3.0,200,"Saturn.png",sphere_texture_vertecies,200);
+            let uranus = new Sphere(3.0,340,"Uranus.png",sphere_texture_vertecies,340);
+            let neptune = new Sphere(4.0,430,"Neptune.png",sphere_texture_vertecies,430);
+            let moon = new Sphere(0.1,3,"Moon.png",sphere_texture_vertecies,81);
+            let phobos = new Sphere(0.1,4,"Phobos.png",sphere_texture_vertecies,104);
+            let deimos = new Sphere(0.1,6,"Deimos.png",sphere_texture_vertecies,106);
+
+            planets.push(sun);
+            planets.push(mercury);
+            planets.push(venus);
+            planets.push(earth);
+            planets.push(mars);
+            planets.push(jupiter);
+            planets.push(saturn);
+            planets.push(uranus);
+            planets.push(neptune);
+            planets.push(moon);
+            planets.push(phobos);
+            planets.push(deimos);
+
+            texture_buffers.push(sun.TextureFileBuffer());
+            texture_buffers.push(mercury.TextureFileBuffer());
+            texture_buffers.push(venus.TextureFileBuffer());
+            texture_buffers.push(earth.TextureFileBuffer());
+            texture_buffers.push(mars.TextureFileBuffer());
+            texture_buffers.push(jupiter.TextureFileBuffer());
+            texture_buffers.push(saturn.TextureFileBuffer());
+            texture_buffers.push(uranus.TextureFileBuffer());
+            texture_buffers.push(neptune.TextureFileBuffer());
+            texture_buffers.push(moon.TextureFileBuffer());
+            texture_buffers.push(phobos.TextureFileBuffer());
+            texture_buffers.push(deimos.TextureFileBuffer());
+
+            //Macierze opisujące położenie wirtualnej kamery w przestrzenie 3D
+            let aspect = gl.viewportWidth/gl.viewportHeight;
+            let fov = 45.0 * Math.PI / 180.0; //Określenie pola widzenia kamery
+            let zFar = 1000.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbliższego zNear do najdalszego zFar)
+            let zNear = 0.1;
+            uPMatrix = [
+                1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
+                0                         ,1.0/(Math.tan(fov/2))         ,0                         ,0                            ,
+                0                         ,0                           ,-(zFar+zNear)/(zFar-zNear)  , -1,
+                0                         ,0                           ,-(2*zFar*zNear)/(zFar-zNear) ,0.0,
+            ];
+
+            for (let i = 0; i < planets.length; i++) {
+                init_phase[i] = (24 * i) % 360;
+                rotation_angle[i] = 0;
+            }
+
+            for (let i = 1.0; i < planets.length; i += 1.0) {
+                rotation_angle_step[i] = 5.0/i;
+            }
+
+            Tick();
+        }
+
+        let uMVMatrix = [
+            1,0,0,0, //Macierz jednostkowa
+            0,1,0,0,
+            0,0,1,0,
+            0,0,10,1
+        ];
+
+        function CalculateOrbitPosition() {
+            for (let i = 0; i < planets.length - 3; i++) {
+                planets[i].changePosition(
+                    planets[i].orbitRadius() * Math.sin((orbit_degree + init_phase[i]) * Math.PI / 180.0),
+                    planets[i].orbitRadius() * Math.cos((orbit_degree + init_phase[i]) * Math.PI / 180.0));
+            }
+            planets[9].changePosition(
+                planets[9].orbitRadius() * Math.sin((orbit_degree + init_phase[9]) * Math.PI / 180.0),
+                planets[9].orbitRadius() * Math.cos((orbit_degree + init_phase[9]) * Math.PI / 180.0),
+                planets[3].getPosX(),planets[3].getPosZ());
+            planets[10].changePosition(
+                planets[10].orbitRadius() * Math.sin((orbit_degree + init_phase[10]) * Math.PI / 180.0),
+                planets[10].orbitRadius() * Math.cos((orbit_degree + init_phase[10]) * Math.PI / 180.0),
+                planets[4].getPosX(),planets[4].getPosZ());
+            planets[11].changePosition(
+                planets[11].orbitRadius() * Math.sin((orbit_degree + init_phase[11]) * Math.PI / 180.0),
+                planets[11].orbitRadius() * Math.cos((orbit_degree + init_phase[11]) * Math.PI / 180.0),
+                planets[4].getPosX(),planets[4].getPosZ());
+
+            orbit_degree = (orbit_degree + orbit_step) % 360;
+
+            console.log("Orbital: " + orbit_degree);
+            console.log("sin: " + Math.sin(orbit_degree * Math.PI / 180.0));
+            console.log("cos: " + Math.cos(orbit_degree * Math.PI / 180.0));
+            console.log("Sun x: " + planets[0].pos_x);
+            console.log("Sun z: " + planets[0].pos_z);
+            console.log("Earth x: " + planets[1].pos_x);
+            console.log("Earth z: " + planets[1].pos_z);
+            console.log("Moon x: " + planets[9].pos_x);
+            console.log("Moon z: " + planets[9].pos_z);
+        }
+
+        function CalculateRotationAngle() {
+            for (let i = 0; i < planets.length; i++) {
+                planets[i].setRotationAngle(rotation_angle[i])
+                rotation_angle[i] = (rotation_angle[i] + rotation_angle_step[i]) % 360;
+            }
+        }
+
+        function CalculatePosition(pos_x,pos_z) {
+            let uMVMatrix = [
+                1,0,0,0, //Macierz jednostkowa
+                0,1,0,0,
+                0,0,1,0,
+                0,0,0,1
+            ];
+
+            let uMVRotZ = [
+                +Math.cos(CameraAngleZ*Math.PI/180.0),+Math.sin(CameraAngleZ*Math.PI/180.0),0,0,
+                -Math.sin(CameraAngleZ*Math.PI/180.0),+Math.cos(CameraAngleZ*Math.PI/180.0),0,0,
+                0,0,1,0,
+                0,0,0,1
+            ];
+
+            let uMVRotY = [
+                +Math.cos(CameraAngleY*Math.PI/180.0),0,-Math.sin(CameraAngleY*Math.PI/180.0),0,
+                0,1,0,0,
+                +Math.sin(CameraAngleY*Math.PI/180.0),0,+Math.cos(CameraAngleY*Math.PI/180.0),0,
+                0,0,0,1
+            ];
+
+            let uMVRotX = [
+                1,0,0,0,
+                0,+Math.cos(CameraAngleX*Math.PI/180.0),+Math.sin(CameraAngleX*Math.PI/180.0),0,
+                0,-Math.sin(CameraAngleX*Math.PI/180.0),+Math.cos(CameraAngleX*Math.PI/180.0),0,
+                0,0,0,1
+            ];
+
+            let uMVTranslateX = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                TranslateX,0,0,1
+            ];
+
+            let uMVTranslateY = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                0,TranslateY,0,1
+            ];
+
+            let uMVTranslateZ = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                0,0,TranslateZ,1
+            ];
+
+            let uMVObject = [
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                pos_x,0,pos_z,1
+            ];
+
+            uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateX);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateY);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateZ);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVObject);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVRotX);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVRotY);
+            uMVMatrix = MatrixMul(uMVMatrix,uMVRotZ);
+
+            return uMVMatrix;
+        }
+
+        function Tick() {
+
+            let uMVMatrix = [];
+
+            //Render Scene
+            gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+            gl.clearColor(0.0,0.0,0.0,1.0); //Wyczyszczenie obrazu kolorem czarnym
+            gl.clearDepth(1.0);             //Wyczyścienie bufora głebi najdalszym planem
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.useProgram(shaderProgram); //Użycie przygotowanego programu shaderowego
+
+            gl.enable(gl.DEPTH_TEST);           // Włączenie testu głębi - obiekty bliższe mają przykrywać obiekty dalsze
+            gl.depthFunc(gl.LEQUAL);            //
+
+            gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamięci karty graficznej
+
+            for (let i = 0; i < planets.length; i++) {
+                uMVMatrix = CalculatePosition(planets[i].getPosX(),planets[i].getPosZ());
+
+                gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMVMatrix"), false, new Float32Array(uMVMatrix));
+                gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
+                gl.bindBuffer(gl.ARRAY_BUFFER, planets[i].PositionBuffer());
+                gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), planets[i].PositionBuffer().itemSize, gl.FLOAT, false, 0, 0);
+
+                gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazanie kolorów
+                gl.bindBuffer(gl.ARRAY_BUFFER, planets[i].ColorBuffer());
+                gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), planets[i].ColorBuffer().itemSize, gl.FLOAT, false, 0, 0);
+
+                gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexCoords"));  //Pass the geometry
+                gl.bindBuffer(gl.ARRAY_BUFFER, planets[i].TextureBuffer());
+                gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexCoords"), planets[i].TextureBuffer().itemSize, gl.FLOAT, false, 0, 0);
+
+                gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexNormal"));  //Przekazywanie wektorów normalnych
+                gl.bindBuffer(gl.ARRAY_BUFFER, planets[i].NormalsBuffer());
+                gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexNormal"), planets[i].NormalsBuffer().itemSize, gl.FLOAT, false, 0, 0);
+
+                gl.uniform3f(gl.getUniformLocation(shaderProgram, "uLightPosition"),lightX,lightY,lightZ);
+
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture_buffers[i]);
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 0);
+
+                gl.drawArrays(gl.TRIANGLES, 0, planets[i].PositionBuffer().numItems*planets[i].PositionBuffer().itemSize); //Faktyczne wywołanie rendrowania
+            }
+
+            CalculateOrbitPosition();
+
+            // console.log("X: " + TranslateX + "\n");
+            // console.log("Y: " + TranslateY + "\n");
+            // console.log("Z: " + TranslateZ + "\n");
+
+            setTimeout(Tick,10);
+        }
+        function handlekeydown(event) {
+            if(event.keyCode===87) { //W
+                TranslateZ += MovementSpeedMultiplier*Math.cos(CameraAngleY*Math.PI/180.0);
+                TranslateX -= MovementSpeedMultiplier*Math.sin(CameraAngleY*Math.PI/180.0);
+                TranslateY -= MovementSpeedMultiplier*Math.sin(CameraAngleX*Math.PI/180.0);
+            }
+            if(event.keyCode===83) { //S
+                TranslateZ -= MovementSpeedMultiplier*Math.cos(CameraAngleY*Math.PI/180.0);
+                TranslateX += MovementSpeedMultiplier*Math.sin(CameraAngleY*Math.PI/180.0);
+                TranslateY += MovementSpeedMultiplier*Math.sin(CameraAngleX*Math.PI/180.0);
+            }
+            if(event.keyCode===68) { //D
+                TranslateZ -= MovementSpeedMultiplier*Math.sin(CameraAngleY*Math.PI/180.0);
+                TranslateX -= MovementSpeedMultiplier*Math.cos(CameraAngleY*Math.PI/180.0);
+            }
+            if(event.keyCode===65) { //A
+                TranslateZ += MovementSpeedMultiplier*Math.sin(CameraAngleY*Math.PI/180.0);
+                TranslateX += MovementSpeedMultiplier*Math.cos(CameraAngleY*Math.PI/180.0);
+            }
+            //Numepad Keyboard
+            if(event.keyCode===104) { //8
+                CameraAngleX=CameraAngleX+CameraAngleSpeedMultiplier;
+            }
+            if(event.keyCode===100) { //4
+                CameraAngleY=CameraAngleY-CameraAngleSpeedMultiplier;
+            }
+            if(event.keyCode===102) { //6
+                CameraAngleY=CameraAngleY+CameraAngleSpeedMultiplier;
+            }
+            if(event.keyCode===98) { //2
+                CameraAngleX=CameraAngleX-CameraAngleSpeedMultiplier;
+            }
+            //U I O J K L
+            if(event.keyCode==76) lightX += LightSpeedMultiplier;
+            if(event.keyCode==74) lightX -= LightSpeedMultiplier;
+            if(event.keyCode==73) lightY += LightSpeedMultiplier;
+            if(event.keyCode==75) lightY -= LightSpeedMultiplier;
+            if(event.keyCode==85) lightZ += LightSpeedMultiplier;
+            if(event.keyCode==79) lightZ -= LightSpeedMultiplier;
+        }
+    </script>
+</head>
+<body onload="startGL()" onkeydown="handlekeydown(event)">
+<canvas id="canvas3D" width="1280" height="800" style="border: solid black 1px"></canvas>
+</body>
+</html>
